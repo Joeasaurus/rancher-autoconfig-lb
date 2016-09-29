@@ -8,6 +8,7 @@ import re
 import sys
 import requests
 
+META_URL = 'http://rancher-metadata.rancher.internal/2015-12-19'
 
 try:
     CATTLE_URL = os.environ["CATTLE_URL"]
@@ -28,52 +29,56 @@ except:
     time.sleep(15)
     sys.exit(1)
 
-
-LAST_MAPPING = []
-META_URL = 'http://rancher-metadata.rancher.internal/2015-12-19'
-
-
 class RancherProxy(object):
 
     def __init__(self):
-        self.services = []
+        self.uuid = ""
         self.envid = None
+        self.services = []
+        self.last_mapping = []
         self.__get_basic_info()
 
+    def __cattle_request(self, uri='%s/self/stack/environment_uuid' % META_URL):
+        r = requests.get(uri,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            auth=(CATTLE_ACCESS_KEY, CATTLE_SECRET_KEY),
+        )
+
+        if r.status_code != 200:
+            raise Exception("Failed to request data: %s" % r.text)
+
+        return r.json()['data']
+
     def __get_basic_info(self):
-        uuid = requests.get('%s/self/stack/environment_uuid' % META_URL).text
-
-        r = requests.get(
-            '%s/projects?uuid=%s' % (CATTLE_URL, uuid),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            auth=(CATTLE_ACCESS_KEY, CATTLE_SECRET_KEY),
-        )
-        if r.status_code != 200:
-            raise Exception("Failed to get environment ID: %s" % r.text)
-        self.envid = r.json()['data'][0]['id']
-
-        r = requests.get(
-            '%s/projects/%s/services' % (CATTLE_URL, self.envid),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            auth=(CATTLE_ACCESS_KEY, CATTLE_SECRET_KEY),
-        )
-        if r.status_code != 200:
-            raise Exception("Failed to get service: %s" % r.text)
-        self.services = r.json()['data']
+        self.uuid = self.__cattle_request()
+        self.envid = self.__cattle_request('%s/projects?uuid=%s' % (CATTLE_URL, uuid))[0]['id']
+        self.services = self.__cattle_request('%s/projects/%s/services' % (CATTLE_URL, self.envid))
 
     def __check_domains(self, domains):
         for d in domains:
             if not re.match(r'^[a-zA-Z0-9=:/\.\-\_]+$', d):
                 raise Exception('Domains format are invalid: %s' % d)
 
+    def __is_usable_service(self, service):
+        return ( service['type'] == 'service') &&
+               ( service['state'] not in ('deactivating', 'inactive', 'removed', 'removing')) and
+               ( 'autoconfig.proxy.domain' in service['launchConfig']['labels'] ) and
+               ( 'autoconfig.proxy.certnames' in service['launchconfig']['labels'] )
+
+    def __get_domain_list(self, service):
+        domainLabel = service['launchConfig']['labels']['autoconfig.proxy.domain']
+        return domainLabel.replace(' ', '').split(';')
+
     def get_domain_map(self):
         payload = []
+
         for service in self.services:
             try:
-                if (service['type'] == 'service') and (service['state'] not in ('deactivating', 'inactive', 'removed', 'removing')) and ('autoconfig.proxy.domain' in service['launchConfig']['labels']):
-                    domains = service['launchConfig']['labels']['autoconfig.proxy.domain'].replace(' ', '').replace(';', ',').split(',')
+                if __is_usable_service(service):
+                    domains = __get_domain_list(service)
                     self.__check_domains(domains)
                     payload.append({'serviceId': service['id'], 'ports': domains})
+
             except Exception, e:
                 print >> sys.stderr, 'Error when parsing domains: ' + str(e) + ', ' + str(service)
 
@@ -95,41 +100,44 @@ class RancherProxy(object):
         if ret.status_code != 200:
             raise Exception("Update load balancer failed. Request: %s, Response: %s" % (json.dumps(mapping), ret.text))
 
-
-def parse_change(old, new):
-    add = []
-    remove = []
-    update = []
-    _old = dict([(x['serviceId'], x['ports']) for x in old])
-    _new = dict([(x['serviceId'], x['ports']) for x in new])
-    for k in (set(_new) - set(_old)):
-        add.append(','.join(_new[k]))
-    for k in (set(_old) - set(_new)):
-        remove.append(','.join(_old[k]))
-    for k in (set(_new) & set(_old)):
-        if set(_new[k]) != set(_old[k]):
-            update.append('%s -> %s' % (','.join(_old[k]), ','.join(_new[k])))
-    return (add, remove, update)
+        self.last_mapping = mapping
 
 
-def update():
-    global LAST_MAPPING
-    rp = RancherProxy()
+    def parse_change(self, new):
+        add = []
+        remove = []
+        update = []
+        _old = dict([(x['serviceId'], x['ports']) for x in self.last_mapping])
+        _new = dict([(x['serviceId'], x['ports']) for x in new])
+        for k in (set(_new) - set(_old)):
+            add.append(','.join(_new[k]))
+        for k in (set(_old) - set(_new)):
+            remove.append(','.join(_old[k]))
+        for k in (set(_new) & set(_old)):
+            if set(_new[k]) != set(_old[k]):
+                update.append('%s -> %s' % (','.join(_old[k]), ','.join(_new[k])))
+        return (add, remove, update)
+
+
+def update(rp):
     target_lb = rp.get_target_lb()
     mapping = rp.get_domain_map()
-    add, remove, update = parse_change(LAST_MAPPING, mapping)
+
+    add, remove, update = rp.parse_change(mapping)
+
     if (len(add) == 0) and (len(remove) == 0) and (len(update) == 0):
         return
     else:
         print "ADD: %s\nREMOVE: %s\nUPDATE: %s" % ('; '.join(add), '; '.join(remove), '; '.join(update))
         rp.update_proxy(target_lb, mapping)
-        LAST_MAPPING = mapping
 
 
 def main():
+    rp = RancherProxy()
+
     while True:
         try:
-            update()
+            update(rp)
         except Exception, e:
             print >> sys.stderr, 'System error: ' + str(e)
 
