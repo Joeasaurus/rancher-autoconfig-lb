@@ -5,28 +5,8 @@ import re
 import sys
 import requests
 
-META_URL = 'http://rancher-metadata.rancher.internal/2015-12-19'
-
-try:
-	CATTLE_URL = os.environ["CATTLE_URL"]
-	CATTLE_ACCESS_KEY = os.environ["CATTLE_ACCESS_KEY"]
-	CATTLE_SECRET_KEY = os.environ["CATTLE_SECRET_KEY"]
-
-	try:
-		TARGET_SERVICE = os.environ["TARGET_SERVICE"]
-	except:
-		try:
-			r = requests.get('%s/self/container/labels/autoconfig.proxy.service_name' % META_URL)
-			r.raise_for_status()
-			TARGET_SERVICE = r.text
-		except:
-			print >> sys.stderr, "You must set label autoconfig.proxy.service_name as target load balancer name"
-			time.sleep(15)
-			sys.exit(1)
-except:
-	print >> sys.stderr, "You must set label 'io.rancher.container.create_agent: true' and 'io.rancher.container.agent.role: environment' for this service"
-	time.sleep(15)
-	sys.exit(1)
+from RancherAPI import MetadataAPI
+from RancherAPI import LoadBalancerService
 
 class ChangingList(object):
 	def __init__(self):
@@ -63,58 +43,46 @@ class ChangingList(object):
 
 		return (self.changed, add, remove, update)
 
-class RancherProxy(object):
-	def __init__(self, leproxy):
-		self.le = leproxy
-		self.envid = ""
+class RancherProxy(MetadataAPI):
+	def __init__(self):
+		try:
+			self.auth_list = (os.environ["CATTLE_ACCESS_KEY"], os.environ["CATTLE_SECRET_KEY"])
+		except KeyError, e:
+			self.auth_list = None
+
+		super(RancherProxy, self).__init__(os.environ["CATTLE_URL"], auth_list = self.auth_list)
+
+		self.target_loadbalancer_name = None
+
 		self.services = []
 		self.route_list = ChangingList()
-		self.cert_list = ChangingList()
 
 		self.__get_cattle_info()
-
-	def __cattle_get(self, uri):
-		r = requests.get(uri,
-			headers={"Content-Type": "application/json", "Accept": "application/json"},
-			auth=(CATTLE_ACCESS_KEY, CATTLE_SECRET_KEY),
-		)
-
-		if r.status_code != 200:
-			raise Exception("Failed to request data: %s" % r.text)
-
-		return r
-
-	def __cattle_post(self, uri, payload = {}):
-		#print "Posting to ", uri, " with ", payload
-		r = requests.post(uri,
-			data=json.dumps(payload),
-			headers={"Content-Type": "application/json", "Accept": "application/json"},
-			auth=(CATTLE_ACCESS_KEY, CATTLE_SECRET_KEY),
-		)
-
-		if r.status_code != 200:
-			raise Exception("Failed to post data: %s" % r.text)
+		# self.lb_service = RancherLoadBalancerService(self.TARGET_SERVICE, self.envid, self.CATTLE_URL)
 
 	def __get_cattle_info(self):
+		self.services = self.get_services()['data']
+
 		try:
-			self.envid = os.environ["CATTLE_ENV_ID"]
-		except:
-			uuid = requests.get('%s/self/stack/environment_uuid' % META_URL).text
-			self.envid = self.__cattle_get('%s/projects?uuid=%s' % (CATTLE_URL, uuid)).json()['data'][0]['id']
+			self.target_loadbalancer_name = os.environ["TARGET_SERVICE"]
+		except KeyError, e:
+			try:
+				self_container = self.get_container()
+				self.target_loadbalancer_name = self_container['labels']['autoconfig.proxy.service_name']
+			except KeyError, e:
+				raise Exception("You must set label autoconfig.proxy.service_name as target load balancer name")
 
-		self.services = self.__cattle_get('%s/projects/%s/services' % (CATTLE_URL, self.envid)).json()['data']
-		self.certificates = self.__cattle_get('%s/certificates' % CATTLE_URL)
-		print "Got services and certificates..."
 
-	def __is_basic_service(self, service):
+		self.lb_service = LoadBalancerService(self.target_loadbalancer_name, os.environ["CATTLE_URL"], auth_list = self.auth_list)
+
+		print "Got services..."
+
+	def is_tagged_service(self, service):
 		return (( service['type'] == 'service') and
 			   ( service['state'] not in ('deactivating', 'inactive', 'removed', 'removing')) and
 			   ( 'autoconfig.proxy.routes' in service['launchConfig']['labels'] ))
 
-	def __is_certed_service(self, service):
-		return (self.__is_basic_service(service) and ( 'autoconfig.proxy.certificates' in service['launchConfig']['labels'] ))
-
-	def __get_label(self, service, label):
+	def get_label(self, service, label):
 		return service['launchConfig']['labels'][label]
 
 	def __check_routes(self, routes):
@@ -129,8 +97,8 @@ class RancherProxy(object):
 		for service in self.services:
 			# print "Label for ", service['name']
 			try:
-				if self.__is_basic_service(service):
-					routes = self.__get_label(service, 'autoconfig.proxy.routes').replace(' ', '').split(';')
+				if self.is_tagged_service(service):
+					routes = self.get_label(service, 'autoconfig.proxy.routes').replace(' ', '').split(';')
 					self.__check_routes(routes)
 
 					self.route_list.append({'serviceId': service['id'], 'ports': routes})
@@ -140,58 +108,12 @@ class RancherProxy(object):
 
 		return self.route_list.has_changes('serviceId', 'ports')
 
-	def __get_cert_list(self):
-		self.cert_list.new_list()
 
-		for service in self.services:
-			try:
-				if self.__is_certed_service(service):
-					certstring = self.__get_label(service, 'autoconfig.proxy.certificates')
-
-					# i.e. TITLE : COMMA LIST ; TITLE.....
-					separate_certs = certstring.replace(' ', '').split(';')
-
-					for certspec in separate_certs[:]:
-
-						title_split = certspec.split(':')
-						alt_names = ""
-
-						if len(title_split) > 1:
-							alt_names = title_split[1]
-
-						self.cert_list.append({'title': title_split[0], 'alt_names': [alt_names]})
-
-			except Exception, e:
-				print >> sys.stderr, 'Error when parsing certs: ' + str(e) + ', ' + str(service)
-
-		return self.cert_list.has_changes('title', 'alt_names')
-
-	def __get_target_lb(self):
-		for service in self.services:
-			if service['name'] == TARGET_SERVICE and service['type'] == 'loadBalancerService':
-				return service['id']
-		raise Exception('Target load balancer not found: %s' % TARGET_SERVICE)
-
-	def __set_routes_on_lb(self, lb_id, r_list):
-		  self.__cattle_post(
-			'%s/projects/%s/loadbalancerservices/%s/?action=setservicelinks' % (CATTLE_URL, self.envid, lb_id),
-			{'serviceLinks': r_list})
-
-	def __add_update_certs(add_these, update_these):
-		print "UPDATED"
+	def __set_routes_on_lb(self, r_list):
+		self.lb_service.set_service_links(r_list)
 
 	def update(self):
-		target_lb = self.__get_target_lb()
-		#print "Got target lb ", target_lb
-
 		r_changed, r_add, r_remove, r_update = self.__get_route_list()
 		if r_changed:
-			self.__set_routes_on_lb(target_lb, self.route_list.list)
+			self.__set_routes_on_lb(self.route_list.list)
 			print "Set routes on LB!"
-
-		c_changed, c_add, c_remove, c_update = self.__get_cert_list()
-		if c_changed:
-			certs = self.le.getcerts(c_add + c_update)
-			# self.__add_update_certs(c_add, c_update)
-			# self.__set_certs_on_lb(c_add, c_update)
-			print "Set certificates in Rancher & LB!"

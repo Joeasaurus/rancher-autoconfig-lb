@@ -1,17 +1,16 @@
-import os
+import os, sys
 from time import sleep
-import le
-LEUI = le.LetsEncryptUI
+from le import LetsEncrypt
+
+from ChallengeProxy import R53Proxy
 
 
-class LEProxy(LEUI):
-	def __init__(self, home_dir, dnsproxy):
-		self.dns_auth = dnsproxy
+class LEProxy(LetsEncrypt):
+	def __init__(self, home_dir):
 
 		lehome = home_dir
-
 		config = {
-			"name": "rancher-atuoconfig-lb_le",
+			"name": "rancher-autoconfig-lb_le",
 			"email": "jme+le@shadowacre.ltd",
 			"home": lehome,
 			"lock": os.path.join(lehome, "lock"),
@@ -21,61 +20,64 @@ class LEProxy(LEUI):
 			"pk": os.path.join(lehome, "pk.pem"),
 			"config": os.path.join(lehome, "config"),
 			"debug": False,
-			"url": "https://acme-staging.api.letsencrypt.org/directory", #"https://acme-v01.api.letsencrypt.org/directory"
+			"url": os.environ["CA"],
+			#"https://acme-staging.api.letsencrypt.org/directory"
+			#"https://acme-v01.api.letsencrypt.org/directory"
 			"register": True,
 			"ecdsa": False
 		}
-		self.config = config
 
+		self.dns_auth = R53Proxy()
+		super(LEProxy, self).__init__(config)
 
-		if not os.path.exists(config["home"]):
-				os.mkdir(config["home"])
+		try:
+			self.method_register("https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf " + self.config["email"])
+		except Exception, e:
+			if str(e) == "ERR_INUSE":
+				print "Registration already performed, continuing.."
 
-		#create directory for certificates
-		if not os.path.exists(config["certs"]):
-				os.mkdir(config["certs"])
+	def __challenge_domains(self, domain_list):
+		challenge_pairs = []
 
-		#create lock file
-		if not os.path.exists(config["lock"]):
-				le.savesync(config["lock"], le.tobytes(" "))
-
-		#create RSA master keys
-		if not os.path.exists(config["sk"]):
-				tmpsk = "%s.tmp" % (config["sk"])
-				tmppk = "%s.tmp" % (config["pk"])
-				le.sslutils_rsa_makekey(tmpsk, tmppk, 3072)
-				os.rename(tmppk, config["pk"])
-				os.rename(tmpsk, config["sk"])
-
-		super(LEProxy, self).__init__()
-
-	def getcerts(self, names):
-		for cert_list in names:
-			domain_name   = cert_list.keys()[0]
-			domain_concat = domain_name + " " + " ".join(cert_list[domain_name])
-			domain_list   = domain_concat.split(" ")
-			challenges    = [self.method_domainchallenge(name) for name in domain_list]
+		try:
+			challenges = [self.method_domainchallenge(name) for name in domain_list]
 
 			challenge_pairs = [
 				[ c["dns-01"][1].replace("'","").split(":")[0],
-				  c["dns-01"][2] ]
+				  c["dns-01"][1].replace("'","").split(":")[1] ]
 				for c in challenges
 			]
 
 			#print challenges
-			for cp in challenge_pairs:
-				print cp[0] + " ----> " + cp[1]
+			# for cp in challenge_pairs:
+			# 	print cp[0] + " ----> " + cp[1]
 
 			if self.dns_auth.add_challenge(challenge_pairs):
-				print "Sleeping to let LE catch up..."; sleep(40)
 				for d in domain_list:
-					print d
 					self.method_domainconfirm(d + " dns-01")
+		except Exception, e:
+			print >> sys.stderr, e
+			return False
 
-				# cert = self.method_certificateget(domain_concat)
-				# print cert
+		return challenge_pairs
 
-			# Set challenges in r53
-			# Confirm them with LE
-			# request a certificate for them
-			# store the cert
+	def getcerts(self, certs):
+		cert_index = 0
+
+		for cert_list in certs[:]:
+
+			domain_name   = cert_list['CN']
+			domain_concat = domain_name + " " + " ".join(cert_list['alt_names'])
+			domain_list   = domain_concat.split(" ")
+
+			challenged = self.__challenge_domains(domain_list)
+			if challenged:
+				cert = self.method_certificateget(domain_concat)
+				cert_list['ssl'] = cert
+			else:
+				cert_list['ssl'] = False
+
+			certs[cert_index] = cert_list
+			cert_index += 1
+
+		return certs

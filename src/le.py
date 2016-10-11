@@ -400,7 +400,8 @@ def jwkthumb(e, n):
 #main.py
 import getopt, os, time, fcntl
 
-class LetsEncryptUI(object):
+class LetsEncrypt(object):
+		config = {}
 		"""
 		XXX TODO
 		Class which implements user friendly
@@ -414,8 +415,31 @@ class LetsEncryptUI(object):
 		INFO = '\033[93m' #yellow
 		SUCCESS = '\033[94m' #blue
 
-		def __init__(self):
+		def __init__(self, config):
+			self.config = config
 
+			if not os.path.exists(config["home"]):
+					os.mkdir(config["home"])
+
+			#create directory for certificates
+			if not os.path.exists(config["certs"]):
+					os.mkdir(config["certs"])
+
+			#create lock file
+			if not os.path.exists(config["lock"]):
+					savesync(config["lock"], tobytes(" "))
+
+			#create RSA master keys
+			if not os.path.exists(config["sk"]):
+					tmpsk = "%s.tmp" % (config["sk"])
+					tmppk = "%s.tmp" % (config["pk"])
+					sslutils_rsa_makekey(tmpsk, tmppk, 3072)
+					os.rename(tmppk, config["pk"])
+					os.rename(tmpsk, config["sk"])
+
+			self._configure()
+
+		def _configure(self):
 				#load RSA public-key, format it to JWK and make JWK thumbprint
 				(e, n) = sslutils_rsa_getpk(self.config["pk"])
 				self.jwk = jwk(e, n)
@@ -426,12 +450,6 @@ class LetsEncryptUI(object):
 
 				#send query for ACME url's for new-authz, new-cert, revoke-cert, ..
 				self.acmedirectory = self._directory()
-
-				try:
-					if self.config['register']:
-						self.method_register("https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf " + self.config["email"])
-				except:
-					pass
 
 		def _lock(self, fn = ""):
 				"""
@@ -522,37 +540,28 @@ class LetsEncryptUI(object):
 
 
 		def method_register(self, arg):
-				"""
-				Methods registers master RSA public-key, email, [telephone], ...
-				"""
-
-				if not len(arg):
-						self.printdoc(self.method_register)
-						raise Exception("usage: register agreement-url email [telephone]")
 
 				opts = arg.split(" ")
-				if len(opts) < 2:
-						self.printdoc(self.method_register)
-						raise Exception("usage: register agreement-url email [telephone]")
 
 				argeement = opts[0]
 
 				contacts = ["mailto:%s" % (opts[1])]
-				if len(opts) > 2:
-						contacts.append("tel:%s" % (opts[2]))
 
 				payload = {
-						"resource": "new-reg",
-						"contact": contacts,
-						"agreement": argeement,
+					"resource": "new-reg",
+					"contact": contacts,
+					"agreement": argeement,
 				}
 
 				headers = {'content-type': 'application/json'}
 				response = self._httpquery(self.acmedirectory["new-reg"], self.jws(payload), headers)
+
+				if response["status"] == 409:
+					raise Exception("ERR_INUSE")
 				if response["status"] != 201:
-						if "jsonbody" in response:
-								raise Exception(response["jsonbody"])
-						raise Exception(response["error"])
+					if "jsonbody" in response:
+						raise Exception(response["jsonbody"])
+					raise Exception(response["error"])
 
 
 
@@ -625,8 +634,7 @@ class LetsEncryptUI(object):
 				"""
 
 				if not len(domain):
-						self.printdoc(self.method_domainconfirm)
-						raise Exception("usage: domainconfirm domain [type]")
+					raise Exception("usage: domainconfirm domain [type]")
 
 				domains = []
 				tmp = domain.split(" ")
@@ -661,7 +669,6 @@ class LetsEncryptUI(object):
 				data = open(chl_dst, 'r').read().split('\n')
 				url = data[0]
 				keyauth = data[2]
-				print data
 
 				i = 0
 				timeouts = [10, 100, 1000]
@@ -790,7 +797,7 @@ class LetsEncryptUI(object):
 				os.link(im_tmp, im_bak)
 				os.rename(im_tmp, im_dst)
 
-				self._log("KEY=%s\nCERT=%s\nIM=%s\n" % (key_dst, crt_dst, im_dst), self.INFO)
+				return {"key": key_dst, "cert": crt_dst, "im": im_dst}
 
 
 		def method_certificaterevokeold(self, dummy):
@@ -835,95 +842,3 @@ class LetsEncryptUI(object):
 						os.rename(fnk, fnkr)
 						if os.path.exists(fni):
 								os.rename(fni, fnir)
-
-
-usagetext = """
- name:
-   letsencryptshell - shell style commandline client for LetsEncrypt
-
- syntax:
-   letsencryptshell [options]
-
- options:
-   -h	 (optional): print usage
-   -d	 (optional): debug mode
-   -u url (optional): ACME directory (default: https://acme-v01.api.letsencrypt.org/directory)
-   -e	 (optional): create ECDSA key + cert instead of RSA
-"""
-
-
-def usage(x = ""):
-		"""
-		Print usage.
-		XXX TODO
-		"""
-		print(usagetext)
-		sys.exit(100)
-
-#program entry point
-if __name__ == "__main__":
-
-
-		#create config structure
-		config = {}
-		config["name"] = "LetsEncryptShell"
-		config["home"] = os.path.join(os.environ["HOME"], ".letsencryptshell")
-		config["lock"] = os.path.join(os.environ["HOME"], ".letsencryptshell", "lock")
-		config["certs"] = os.path.join(os.environ["HOME"], ".letsencryptshell", "certs")
-		config["histfile"] = os.path.join(config["home"], "histfile")
-		config["sk"] = os.path.join(config["home"], "sk.pem")
-		config["pk"] = os.path.join(config["home"], "pk.pem")
-		config["config"] = os.path.join(config["home"], "config")
-		config["debug"] = True #XXX TODO - debug is currently default
-		config["url"] = "https://acme-v01.api.letsencrypt.org/directory"
-		#config["url"] = "https://acme-staging.api.letsencrypt.org/directory"
-		config["register"] = False
-		config["ecdsa"] = False
-
-		#parse program parameters
-		try:
-				options, arguments = getopt.getopt(sys.argv[1:], 'u:hde')
-		except:
-				#bad option
-				usage("Error: Bad option.")
-				sys.exit(100)
-
-		# process options
-		for opt, val in options:
-				if opt == "-h":
-						usage()
-						sys.exit(100)
-				if opt == "-u":
-						config["url"] = val
-				if opt == "-r":
-						config["register"] = True
-				if opt == "-d":
-						config["debug"] = True
-				if opt == "-e":
-						config["ecdsa"] = True
-
-
-		#home directory
-		if not "HOME" in os.environ:
-				print("$HOME not set!!")
-				sys.exit(111)
-
-		#create home directory
-		if not os.path.exists(config["home"]):
-				os.mkdir(config["home"])
-		#create directory for certificates
-		if not os.path.exists(config["certs"]):
-				os.mkdir(config["certs"])
-		#create lock file
-		if not os.path.exists(config["lock"]):
-				savesync(config["lock"], tobytes(" "))
-		#create RSA master keys
-		if not os.path.exists(config["sk"]):
-				tmpsk = "%s.tmp" % (config["sk"])
-				tmppk = "%s.tmp" % (config["pk"])
-				sslutils_rsa_makekey(tmpsk, tmppk, 3072)
-				os.rename(tmppk, config["pk"])
-				os.rename(tmpsk, config["sk"])
-
-		ui = LetsEncryptUI(config)
-		sys.exit(ui.serve())
