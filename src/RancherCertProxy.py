@@ -84,7 +84,7 @@ class RancherCertProxy(RancherProxy):
 			else:
 				cert_service = CertificateService(url = self.api_url, auth_list = self.auth_list)
 
-			if cert_deets.has_key('ssl'):
+			if cert_deets['ssl']:
 				cert_service.cert = self.__get_file_contents(cert_deets['ssl']['cert'])
 				cert_service.key = self.__get_file_contents(cert_deets['ssl']['key'])
 				cert_service.certChain = self.__get_file_contents(cert_deets['ssl']['im'])
