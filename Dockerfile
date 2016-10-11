@@ -1,4 +1,8 @@
-FROM python:2.7-alpine
+FROM debian:jessie
+
+MAINTAINER Joe Eaves <joe.eaves@shadowacre.ltd>
+
+RUN apt-get update && apt-get install -y python python-pip
 
 WORKDIR /var/lib/rancher-autoconfig-lb/
 ADD src/requirements.txt /tmp/
