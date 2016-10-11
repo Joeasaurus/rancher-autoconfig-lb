@@ -4,6 +4,11 @@ import logging
 from APIHandler import MetadataAPI
 
 class ServiceObject(MetadataAPI):
+	def __init__(self, **kwargs):
+		super(ServiceObject, self).__init__(**kwargs)
+		self._rw_api_data = {}
+		self._ro_api_data = {}
+
 	def create(self):
 		logging.error("You called the base class boi" + self.name)
 
@@ -13,9 +18,7 @@ class ServiceObject(MetadataAPI):
 	def delete(self):
 		logging.error("You called the base class boi" + self.name)
 
-	def is_error(self, data):
-		if isinstance(data, dict):
-			if 'code' in data and data['code'] == 404:
-				return True
-
-		return False
+	def _get_rw(self, key):
+		return self._rw_api_data[key]
+	def _set_rw(self, key, val):
+		self._rw_api_data[key] = val

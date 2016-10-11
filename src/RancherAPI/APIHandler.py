@@ -257,7 +257,7 @@ class MetadataAPI(object):
 		return self.get_host_field("name", host_name)
 
 	def is_error(self, data):
-		return (isinstance(data, dict) and ('code' in data and data['code'] != 200))
+		return (isinstance(data, dict) and ('status' in data and data['status'] != 200))
 
 	def no_unicode(self, h):
 		if isinstance(h, basestring):

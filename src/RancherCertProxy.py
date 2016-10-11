@@ -78,22 +78,21 @@ class RancherCertProxy(RancherProxy):
 			print cert_deets
 			name = cert_deets['CN']
 			description = "Managed by rancher-autoconfig-lb"
-			cert = self.__get_file_contents(cert_deets['ssl']['cert'])
-			key = self.__get_file_contents(cert_deets['ssl']['key'])
-			chain = self.__get_file_contents(cert_deets['ssl']['im'])
 
 			if name in self.certs_in_rancher:
 				cert_service = self.certs_in_rancher[name]['cert_service']
 			else:
 				cert_service = CertificateService(url = self.api_url, auth_list = self.auth_list)
 
+			if cert_deets.has_key('ssl'):
+				cert_service.cert = self.__get_file_contents(cert_deets['ssl']['cert'])
+				cert_service.key = self.__get_file_contents(cert_deets['ssl']['key'])
+				cert_service.certChain = self.__get_file_contents(cert_deets['ssl']['im'])
+
 			cert_service.name = name
 			cert_service.description = description
-			cert_service.cert = cert
-			cert_service.key = key
-			cert_service.certChain = chain
 
-			if cert_deets['id']:
+			if cert_deets.has_key('id'):
 				print "Updating existing cert by ID"
 				cert_service.update()
 			else:
@@ -115,12 +114,14 @@ class RancherCertProxy(RancherProxy):
 				if dcid is None:
 					self.lb_service.defaultCertificateId = dcid = cert_id
 				elif cert_id not in [dcid] + cids:
-					self.lb_service.certificateIds.append(cert_id)
+					cids.append(cert_id)
 				else:
 					print "Certificate already registered on LB"
 
-		self.lb_service.update()
-		return True
+		if len(cids) > 0:
+			self.lb_service.certificateIds = cids
+
+		return self.lb_service.update()
 
 	def __loop_cert_labels(self, labels, callback):
 		for label in labels:
@@ -147,8 +148,8 @@ class RancherCertProxy(RancherProxy):
 				if cn_dict['CN'] in self.certs_in_rancher:
 					cn_dict['id'] = self.certs_in_rancher[cn_dict['CN']]['id']
 					if not self.certs_for_renewal.has_key(cn_dict['CN']):
-						certs_not_renewal.append(cn_dict)
-						return
+						return certs_not_renewal.append(cn_dict)
+
 				certs_to_retrieve.append(cn_dict)
 
 			self.__loop_cert_labels(c_add, check_for_retrieval)
@@ -160,6 +161,7 @@ class RancherCertProxy(RancherProxy):
 			# print c_add
 			# print
 			# print c_update
+			# print
 
 			retrieved_certs = self.le.getcerts(certs_to_retrieve)
 			# print retrieved_certs
