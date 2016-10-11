@@ -16,4 +16,4 @@ ENV AWS_ZONE_ID XXXXXXXX
 ENV CA https://acme-v01.api.letsencrypt.org/directory
 ENV LE_WORK_DIR "/var/lib/rancher-autoconfig-lb/.le"
 
-CMD cd /var/lib/rancher-autoconfig-lb && /bin/sh
+CMD cd /var/lib/rancher-autoconfig-lb && python -u run.py
