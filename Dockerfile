@@ -2,7 +2,7 @@ FROM debian:jessie
 
 MAINTAINER Joe Eaves <joe.eaves@shadowacre.ltd>
 
-RUN apt-get update && apt-get install -y python python-pip
+RUN apt-get update && apt-get install -y python python-pip vim
 
 WORKDIR /var/lib/rancher-autoconfig-lb/
 ADD src/requirements.txt /tmp/

@@ -169,3 +169,5 @@ class RancherCertProxy(RancherProxy):
 			self.__update_certs_on_lb(c_add + c_update, c_remove)
 
 			print "Set certificates in Rancher & LB!"
+		else:
+			print "No certificate changes"

@@ -111,11 +111,7 @@ class RancherProxy(MetadataAPI):
 		return self.route_list.has_changes('serviceId', 'ports')
 
 
-	def __set_routes_on_lb(self, r_list):
-		self.lb_service.set_service_links(r_list)
-
 	def update(self):
 		r_changed, r_add, r_remove, r_update = self.__get_route_list()
-		if r_changed:
-			self.__set_routes_on_lb(self.route_list.list)
-			print "Set routes on LB!"
+		self.lb_service.set_service_links(self.route_list.list)
+		print "Set routes on LB!"
