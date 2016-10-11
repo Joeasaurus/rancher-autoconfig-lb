@@ -37,7 +37,7 @@ class RancherCertProxy(RancherProxy):
 
 		for cert, deets in self.certs_in_rancher.iteritems():
 			#print cert, deets
-			if deets['cert_service'].due_for_renewal()
+			if deets['cert_service'].due_for_renewal():
 				self.certs_for_renewal[cert] = deets
 
 		return self.certs_for_renewal
