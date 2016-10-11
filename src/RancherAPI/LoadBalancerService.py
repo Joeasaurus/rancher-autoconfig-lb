@@ -4,8 +4,8 @@ from ServiceObject import ServiceObject
 
 
 class LoadBalancerService(ServiceObject):
-	def __init__(self, target_name, cattle_url, **kwargs):
-		super(LoadBalancerService, self).__init__(cattle_url, **kwargs)
+	def __init__(self, target_name, **kwargs):
+		super(LoadBalancerService, self).__init__(**kwargs)
 		self.name = target_name
 		self.id = -1
 		self.env_id = ""

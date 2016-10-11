@@ -6,15 +6,13 @@ import time
 import collections
 import re
 
-class MetadataAPI(object):
-	def __init__(self, url = "http://rancher-metadata.rancher.internal/2015-12-19", **kwargs):
-		self.api_url = url
-		self.max_attempts = 3
+INTERNAL_META_URL = "http://rancher-metadata.rancher.internal/2015-12-19"
 
-		if 'auth_list' in kwargs and kwargs['auth_list'] is not None:
-			self.auth_list = kwargs['auth_list']
-		else:
-			self.auth_list = None
+class MetadataAPI(object):
+	def __init__(self, **kwargs):
+		self.max_attempts = 3
+		self.api_url = kwargs['url'] if 'url' in kwargs and kwargs['url'] is not None else INTERNAL_META_URL
+		self.auth_list = kwargs['auth_list'] if 'auth_list' in kwargs and kwargs['auth_list'] is not None else None
 
 	def api_call(self, callback, url, **kwargs):
 		success = False

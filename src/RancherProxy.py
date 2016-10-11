@@ -47,10 +47,12 @@ class RancherProxy(MetadataAPI):
 	def __init__(self):
 		try:
 			self.auth_list = (os.environ["CATTLE_ACCESS_KEY"], os.environ["CATTLE_SECRET_KEY"])
+			self.cattle_url = os.environ['CATTLE_URL']
+			super(RancherProxy, self).__init__(url = self.cattle_url, auth_list = self.auth_list)
 		except KeyError, e:
 			self.auth_list = None
-
-		super(RancherProxy, self).__init__(os.environ["CATTLE_URL"], auth_list = self.auth_list)
+			self.cattle_url = None
+			super(RancherProxy, self).__init__()
 
 		self.target_loadbalancer_name = None
 
@@ -73,7 +75,7 @@ class RancherProxy(MetadataAPI):
 				raise Exception("You must set label autoconfig.proxy.service_name as target load balancer name")
 
 
-		self.lb_service = LoadBalancerService(self.target_loadbalancer_name, os.environ["CATTLE_URL"], auth_list = self.auth_list)
+		self.lb_service = LoadBalancerService(self.target_loadbalancer_name, url = self.cattle_url, auth_list = self.auth_list)
 
 		print "Got services..."
 

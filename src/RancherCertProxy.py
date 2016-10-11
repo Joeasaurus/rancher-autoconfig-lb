@@ -22,7 +22,7 @@ class RancherCertProxy(RancherProxy):
 		self.certificates = self.get_certificates()['data']
 
 		for s_cert in self.certificates:
-			cs = CertificateService(self.api_url, id = s_cert['id'], auth_list = self.auth_list)
+			cs = CertificateService(url = self.api_url, id = s_cert['id'], auth_list = self.auth_list)
 
 			self.certs_in_rancher[s_cert['CN']] = {
 				'id':        s_cert['id'],
@@ -85,7 +85,7 @@ class RancherCertProxy(RancherProxy):
 			if name in self.certs_in_rancher:
 				cert_service = self.certs_in_rancher[name]['cert_service']
 			else:
-				cert_service = CertificateService(self.api_url, auth_list = self.auth_list)
+				cert_service = CertificateService(url = self.api_url, auth_list = self.auth_list)
 
 			cert_service.name = name
 			cert_service.description = description

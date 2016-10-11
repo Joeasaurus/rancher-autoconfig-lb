@@ -2,7 +2,7 @@ FROM python:2.7-alpine
 
 WORKDIR /var/lib/rancher-autoconfig-lb/
 ADD src/requirements.txt /tmp/
-RUN pip install -r /tmp/requirements.txt && python -c 'import requests, boto3'
+RUN pip install -r /tmp/requirements.txt && python -c "import requests, boto3"
 
 COPY src/ /var/lib/rancher-autoconfig-lb/
 

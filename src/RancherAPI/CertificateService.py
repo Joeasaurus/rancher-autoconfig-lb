@@ -4,8 +4,8 @@ from ServiceObject import ServiceObject
 from datetime import datetime, timedelta
 
 class CertificateService(ServiceObject):
-	def __init__(self, cattle_url, **kwargs):
-		super(CertificateService, self).__init__(cattle_url, **kwargs)
+	def __init__(self, **kwargs):
+		super(CertificateService, self).__init__(**kwargs)
 		self.__rw_api_data = {}
 		self.__ro_api_data = {}
 
