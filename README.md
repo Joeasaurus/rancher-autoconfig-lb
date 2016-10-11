@@ -20,9 +20,10 @@ If you want to add services with auto proxy configuration, add the following lab
 
 **Labels**
 
-    autoconfig.proxy.domain:  example.com:80/path=81
+    autoconfig.proxy.routes:  example.com:80/path=81
+    autoconfig.proxy.certificates: domain.tld:subdomain.domain.tld,other.domain.tld
 
-If you want to add multiple domains, use ';' as seperator.
+If you want to add multiple routes or certificates, use ';' as seperator.
 
 The format of domain values see:
 
