@@ -75,7 +75,7 @@ class RancherCertProxy(RancherProxy):
 
 	def __update_certs_in_rancher(self, certs):
 		for cert_deets in certs:
-			print cert_deets
+			#print cert_deets
 			name = cert_deets['CN']
 			description = "Managed by rancher-autoconfig-lb"
 

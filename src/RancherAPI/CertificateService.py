@@ -46,7 +46,7 @@ class CertificateService(ServiceObject):
 
 	def retrieve_by_id(self, id):
 		api_data = self.api_call(self.api_cb_get, self.url % id)
-		print api_data
+		#print api_data
 		if 'status' in api_data and api_data['status'] == 404:
 			raise("404 %s" % api_data)
 
