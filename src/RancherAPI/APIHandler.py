@@ -12,20 +12,25 @@ class MetadataAPI(object):
 	def __init__(self, **kwargs):
 		self.max_attempts = 3
 		self.api_url = kwargs['url'] if 'url' in kwargs and kwargs['url'] is not None else INTERNAL_META_URL
+		self.meta_url = INTERNAL_META_URL
 		self.auth_list = kwargs['auth_list'] if 'auth_list' in kwargs and kwargs['auth_list'] is not None else None
 
 	def api_call(self, callback, url, **kwargs):
 		success = False
 		i = 1
 
+		if 'meta' in kwargs:
+			use_url = self.meta_url + url
+		else:
+			use_url = self.api_url + url
 		#print self.api_url + url
 
 		while (i <= 5 and not success):
 			try:
 				if kwargs and 'payload' in kwargs:
-					req = callback(self.api_url + url, kwargs['payload'])
+					req = callback(use_url, kwargs['payload'])
 		  		else:
-					req = callback(self.api_url + url)
+					req = callback(use_url)
 
 				data = self.no_unicode(req.json())
 				success = True
@@ -67,17 +72,17 @@ class MetadataAPI(object):
 		return self.api_call(self.api_cb_get, "/certificates")
 
 	def get_services(self, **kwargs):
-		return self.api_call(self.api_cb_get, "/services")
+		return self.api_call(self.api_cb_get, "/services", **kwargs)
 
 	def get_service(self, **kwargs):
 		if not kwargs:
-			return self.api_call(self.api_cb_get, "/self/service")
+			return self.api_call(self.api_cb_get, "/self/service", meta = True)
 		else:
 			if 'service_name' not in kwargs:
 				raise ValueError("Must provide the service name")
 
 			if 'stack_name' not in kwargs:
-				return self.api_call(self.api_cb_get, "/self/stack/services/%s" % kwargs['service_name'])
+				return self.api_call(self.api_cb_get, "/self/stack/services/%s" % kwargs['service_name'], meta = True)
 			else:
 				return self.api_call(self.api_cb_get, "/stacks/%s/services/%s" % (kwargs['stack_name'], kwargs['service_name']))
 
@@ -167,7 +172,7 @@ class MetadataAPI(object):
 		container = None
 
 		if container_name is None:
-			container = self.api_call(self.api_cb_get, "/self/container")
+			container = self.api_call(self.api_cb_get, "/self/container", meta = True)
 		else:
 			container = self.api_call(self.api_cb_get, "/containers/%s" % container_name)
 
@@ -181,7 +186,7 @@ class MetadataAPI(object):
 
 	def get_container_field(self, field, container_name):
 		if container_name is None:
-			return self.api_call(self.api_cb_get, "/self/container/%s" % field)
+			return self.api_call(self.api_cb_get, "/self/container/%s" % field, meta = True)
 		else:
 			return self.api_call(self.api_cb_get, "/containers/%s/%s" % (container_name, field))
 
@@ -198,7 +203,7 @@ class MetadataAPI(object):
 			# are we running within the rancher managed network?
 			# FIXME: https://github.com/rancher/rancher/issues/2750
 			if self.is_network_managed():
-				return self.api_call(self.api_cb_get, "/self/container/primary_ip")
+				return self.api_call(self.api_cb_get, "/self/container/primary_ip", meta = True)
 			else:
 				return self.get_host_ip()
 		else:
