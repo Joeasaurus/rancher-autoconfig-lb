@@ -3,6 +3,7 @@ from time import sleep
 from le import LetsEncrypt
 
 from ChallengeProxy import R53Proxy
+from RPExceptions import *
 
 
 class LEProxy(LetsEncrypt):
@@ -39,25 +40,24 @@ class LEProxy(LetsEncrypt):
 	def __challenge_domains(self, domain_list):
 		challenge_pairs = []
 
-		try:
-			challenges = [self.method_domainchallenge(name) for name in domain_list]
+		if not len(domain_list):
+			raise EmptyDomain("domain_list is empty!" + domain_list)
 
-			challenge_pairs = [
-				[ c["dns-01"][1].replace("'","").split(":")[0],
-				  c["dns-01"][1].replace("'","").split(":")[1] ]
-				for c in challenges
-			]
+		challenges = [self.method_domainchallenge(name) for name in domain_list]
 
-			#print challenges
-			# for cp in challenge_pairs:
-			# 	print cp[0] + " ----> " + cp[1]
+		challenge_pairs = [
+			[ c["dns-01"][1].replace("'","").split(":")[0],
+			  c["dns-01"][1].replace("'","").split(":")[1] ]
+			for c in challenges
+		]
 
-			if self.dns_auth.add_challenge(challenge_pairs):
-				for d in domain_list:
-					self.method_domainconfirm(d + " dns-01")
-		except Exception, e:
-			print >> sys.stderr, e
-			return False
+		#print challenges
+		# for cp in challenge_pairs:
+		# 	print cp[0] + " ----> " + cp[1]
+
+		if self.dns_auth.add_challenge(challenge_pairs):
+			for d in domain_list:
+				self.method_domainconfirm(d + " dns-01")
 
 		return challenge_pairs
 
@@ -68,7 +68,7 @@ class LEProxy(LetsEncrypt):
 
 			domain_name   = cert_list['CN']
 			domain_concat = domain_name + " " + " ".join(cert_list['alt_names'])
-			domain_list   = domain_concat.split(" ")
+			domain_list   = [cert_list['CN']] + cert_list['alt_names']
 
 			challenged = self.__challenge_domains(domain_list)
 			if challenged:
