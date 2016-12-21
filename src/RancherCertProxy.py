@@ -1,5 +1,5 @@
 from RancherProxy import RancherProxy, ChangingList
-from RancherAPI import CertificateService
+from RancherAPI import CertificateService, LBConfig
 import subprocess, sys, os
 from datetime import datetime, timedelta
 from LEProxy import LEProxy
@@ -75,7 +75,7 @@ class RancherCertProxy(RancherProxy):
 
 	def __update_certs_in_rancher(self, certs):
 		for cert_deets in certs:
-			#print cert_deets
+			print cert_deets
 			name = cert_deets['CN']
 			description = "Managed by rancher-autoconfig-lb"
 
@@ -101,8 +101,9 @@ class RancherCertProxy(RancherProxy):
 
 	def __update_certs_on_lb(self, certs_to_add, certs_to_remove):
 		self.__get_certificates()
-		dcid = self.lb_service.defaultCertificateId
-		cids = self.lb_service.certificateIds
+		lbconfig = self.lb_service.lbConfig
+		dcid = lbconfig.defaultCertificateId
+		cids = lbconfig.certificateIds
 		if not cids:
 			cids = []
 
@@ -112,14 +113,18 @@ class RancherCertProxy(RancherProxy):
 				cert_id = self.certs_in_rancher[cn]['cert_service'].id
 
 				if dcid is None:
-					self.lb_service.defaultCertificateId = dcid = cert_id
+					lbconfig.defaultCertificateId = dcid = cert_id
 				elif cert_id not in [dcid] + cids:
 					cids.append(cert_id)
 				else:
 					print "Certificate already registered on LB"
 
 		if len(cids) > 0:
-			self.lb_service.certificateIds = cids
+			lbconfig.certificateIds = cids
+
+		print lbconfig.payload()
+
+		self.lb_service.lbConfig = lbconfig
 
 		return self.lb_service.update()
 
@@ -136,11 +141,14 @@ class RancherCertProxy(RancherProxy):
 		self.__get_certificates()
 		self.__get_renewal_certificates()
 		#print self.lb_service.defaultCertificateId, self.lb_service.certificateIds
+		print self.certs_in_rancher
 
 		certs_to_retrieve = []
 		certs_not_renewal = []
 
 		c_changed, c_add, c_remove, c_update = self.__get_cert_labels()
+
+		print c_add, c_remove, c_update
 
 		if c_changed:
 
@@ -163,6 +171,7 @@ class RancherCertProxy(RancherProxy):
 			# print c_update
 			# print
 
+			print certs_to_retrieve
 			retrieved_certs = self.le.getcerts(certs_to_retrieve)
 			# print retrieved_certs
 			self.__update_certs_in_rancher(retrieved_certs)

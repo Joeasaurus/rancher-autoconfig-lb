@@ -1,5 +1,5 @@
 # rancher-autoconfig-lb
-Auto configure plugin for rancher load balancer
+Auto configure plugin for rancher load balancer to add SSL certs via LetsEncrypt and Route53!
 
 Rancher Autoconfig LB
 =====================
@@ -13,17 +13,16 @@ Launch this image with the following labels:
     autoconfig.proxy.service_name: your-proxy-name
 
 
-Services Labels
+Service Labels
 ===============
 
-If you want to add services with auto proxy configuration, add the following labels:
+If you want to add services with auto proxy configuration, add the following label:
 
 **Labels**
 
-    autoconfig.proxy.routes:  example.com:80/path=81
     autoconfig.proxy.certificates: domain.tld:subdomain.domain.tld,other.domain.tld
 
-If you want to add multiple routes or certificates, use ';' as seperator.
+If you want to add multiple certificates, use ';' as seperator.
 
 The format of domain values see:
 
