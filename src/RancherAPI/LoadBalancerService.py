@@ -21,8 +21,8 @@ class LBConfig(ServiceObject):
 			"config": self._get_rw('config'),
 			"defaultCertificateId": self.defaultCertificateId,
 			"certificateIds": self.certificateIds,
-			"portRules": self.portRules,
-			"stickinessPolicy": self._get_rw('stickinessPolicy')
+			"portRules": self.portRules
+			#"stickinessPolicy": self._get_rw('stickinessPolicy')
 		}
 		return p
 
@@ -31,7 +31,7 @@ class LBConfig(ServiceObject):
 		self.defaultCertificateId = lbconfig['defaultCertificateId']
 		self.portRules            = lbconfig['portRules']
 		self._set_rw('config', lbconfig['config'])
-		self._set_rw('stickinessPolicy', lbconfig['stickinessPolicy'])
+		#self._set_rw('stickinessPolicy', lbconfig['stickinessPolicy'])
 		return self
 
 
