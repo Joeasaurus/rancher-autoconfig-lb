@@ -203,7 +203,10 @@ class CertUpdater(RancherProxy):
 
 			certs_to_retrieve.append(cn_dict)
 
-		self.__loop_cert_labels(self.cert_labels, check_for_retrieval)
+
+		for label in self.cert_labels:
+			check_for_retrieval(label)
+		# self.__loop_cert_labels(self.cert_labels, check_for_retrieval)
 
 		# print self.certs_for_renewal
 		# print certs_not_renewal
