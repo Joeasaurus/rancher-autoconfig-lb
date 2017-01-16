@@ -1,11 +1,9 @@
-
-
-class RPException(Exception):
+class LEException(Exception):
 	def __init__(self, message):
 		self.message = message
 
 	def what(self):
 		return message
 
-class EmptyDomain(RPException):
+class EmptyDomain(LEException):
 	'''You didn't provide a domain'''

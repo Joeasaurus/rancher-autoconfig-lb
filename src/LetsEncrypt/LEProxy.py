@@ -3,8 +3,7 @@ from time import sleep
 from le import LetsEncrypt
 
 from ChallengeProxy import R53Proxy
-from RPExceptions import *
-
+from Exceptions import *
 
 class LEProxy(LetsEncrypt):
 	def __init__(self, home_dir):

@@ -1,15 +1,62 @@
-from RancherProxy import RancherProxy, ChangingList
-from RancherAPI import CertificateService, LBConfig
+from RancherAPI import RancherProxy, CertificateService, LBConfig
+from LetsEncrypt import LEProxy
 import subprocess, sys, os
 from datetime import datetime, timedelta
-from LEProxy import LEProxy
 
-class RancherCertProxy(RancherProxy):
+class ChangingList(object):
+	def __init__(self):
+		self.list = []
+		self.last_list = []
+		self.changed = False
+
+	def append(self, newitem):
+		self.list.append(newitem)
+
+	def new_list(self):
+		self.last_list = self.list
+		self.list = []
+
+	def has_changes(self, key_a, key_b):
+		add = []
+		remove = []
+		update = []
+
+		_old = dict([(x[key_a], x[key_b]) for x in self.last_list])
+		_new = dict([(x[key_a], x[key_b]) for x in self.list])
+
+		for k in (set(_new) - set(_old)):
+			add.append({k: _new[k]})
+
+		for k in (set(_old) - set(_new)):
+			remove.append({k: _old[k]})
+
+		for k in (set(_new) & set(_old)):
+			if set(_new[k]) != set(_old[k]):
+				update.append([{k: _old[k]}, {k: _new[k]}])
+
+		self.changed = ( (len(add) > 0) or (len(remove) > 0) or (len(update) > 0) )
+
+		return (self.changed, add, remove, update)
+
+class CertUpdater(RancherProxy):
 	def __init__(self, working_dir):
 		self.le = LEProxy(working_dir)
-		super(RancherCertProxy, self).__init__()
+		self.target_loadbalancer_name = None
+		super(CertUpdater, self).__init__()
 
-		self.cert_labels = ChangingList()
+		try:
+			self.target_loadbalancer_name = os.environ["TARGET_SERVICE"]
+		except KeyError, e:
+			try:
+				self_container = self.get_container()
+				self.target_loadbalancer_name = self_container['labels']['autoconfig.proxy.service_name']
+			except KeyError, e:
+				raise Exception("You must set label autoconfig.proxy.service_name as target load balancer name")
+
+
+		self.lb_service = LoadBalancerService(self.target_loadbalancer_name, url = self.cattle_url, auth_list = self.auth_list)
+
+		self.cert_labels = []
 
 		self.__get_certificates()
 
@@ -44,8 +91,7 @@ class RancherCertProxy(RancherProxy):
 
 	def __get_cert_labels(self):
 		# Move current list to old, so we can populate and compare
-		self.cert_labels.new_list()
-		#self.cert_labels.last_list.append({'CN': u'git.shadowacre.ltd', 'alt_names': [u'docker-registry.git.shadowacre.ltd']})
+		self.cert_labels = []
 
 		# For each services, lets check their certificates label and keep a list :)
 		for service in self.services:
@@ -64,7 +110,7 @@ class RancherCertProxy(RancherProxy):
 
 					self.cert_labels.append({'CN': title_split[0], 'alt_names': alt_names})
 
-		return self.cert_labels.has_changes('CN', 'alt_names')
+		return self.cert_labels
 
 	def __get_file_contents(self, filename):
 		data = None
@@ -146,37 +192,26 @@ class RancherCertProxy(RancherProxy):
 		certs_to_retrieve = []
 		certs_not_renewal = []
 
-		c_changed, c_add, c_remove, c_update = self.__get_cert_labels()
+		self.__get_cert_labels()
+		print self.cert_labels
 
-		print c_add, c_remove, c_update
+		def check_for_retrieval(cn_dict):
+			if cn_dict['CN'] in self.certs_in_rancher:
+				cn_dict['id'] = self.certs_in_rancher[cn_dict['CN']]['id']
+				if not self.certs_for_renewal.has_key(cn_dict['CN']):
+					return certs_not_renewal.append(cn_dict)
 
-		if c_changed:
+			certs_to_retrieve.append(cn_dict)
 
-			def check_for_retrieval(cn_dict):
-				if cn_dict['CN'] in self.certs_in_rancher:
-					cn_dict['id'] = self.certs_in_rancher[cn_dict['CN']]['id']
-					if not self.certs_for_renewal.has_key(cn_dict['CN']):
-						return certs_not_renewal.append(cn_dict)
+		self.__loop_cert_labels(self.cert_labels, check_for_retrieval)
 
-				certs_to_retrieve.append(cn_dict)
+		# print self.certs_for_renewal
+		# print certs_not_renewal
 
-			self.__loop_cert_labels(c_add, check_for_retrieval)
-			self.__loop_cert_labels(c_update, check_for_retrieval)
+		print certs_to_retrieve
+		retrieved_certs = self.le.getcerts(certs_to_retrieve)
+		# print retrieved_certs
+		self.__update_certs_in_rancher(retrieved_certs)
+		self.__update_certs_on_lb(self.cert_labels)
 
-			# print self.certs_for_renewal
-			# print certs_not_renewal
-			# print
-			# print c_add
-			# print
-			# print c_update
-			# print
-
-			print certs_to_retrieve
-			retrieved_certs = self.le.getcerts(certs_to_retrieve)
-			# print retrieved_certs
-			self.__update_certs_in_rancher(retrieved_certs)
-			self.__update_certs_on_lb(c_add + c_update, c_remove)
-
-			print "Set certificates in Rancher & LB!"
-		else:
-			print "No certificate changes"
+		print "Set certificates in Rancher & LB!"
