@@ -79,10 +79,9 @@ class RancherProxy(MetadataAPI):
 
 		print "Got services..."
 
-	def is_tagged_service(self, service):
+	def is_suitable_service(self, service):
 		return (( service['type'] == 'service') and
-			   ( service['state'] not in ('deactivating', 'inactive', 'removed', 'removing')) and
-			   ( 'autoconfig.proxy.routes' in service['launchConfig']['labels'] ))
+			   ( service['state'] not in ('deactivating', 'inactive', 'removed', 'removing')))
 
 	def get_label(self, service, label):
 		return service['launchConfig']['labels'][label]
@@ -99,7 +98,7 @@ class RancherProxy(MetadataAPI):
 		for service in self.services:
 			# print "Label for ", service['name']
 			try:
-				if self.is_tagged_service(service):
+				if self.is_suitable_service(service):
 					routes = self.get_label(service, 'autoconfig.proxy.routes').replace(' ', '').split(';')
 					self.__check_routes(routes)
 

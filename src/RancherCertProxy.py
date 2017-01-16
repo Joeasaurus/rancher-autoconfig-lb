@@ -15,7 +15,7 @@ class RancherCertProxy(RancherProxy):
 
 
 	def __is_certed_service(self, service):
-		return (self.is_tagged_service(service) and ( 'autoconfig.proxy.certificates' in service['launchConfig']['labels'] ))
+		return (self.is_suitable_service(service) and ( 'autoconfig.proxy.certificates' in service['launchConfig']['labels'] ))
 
 	def __get_certificates(self):
 		self.certs_in_rancher = {}
