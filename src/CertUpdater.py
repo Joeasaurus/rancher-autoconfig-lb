@@ -145,7 +145,7 @@ class CertUpdater(RancherProxy):
 				print "Setting cert brand new"
 				cert_service.create()
 
-	def __update_certs_on_lb(self, certs_to_add, certs_to_remove = []):
+	def __update_certs_on_lb(self, newcerts):
 		self.__get_certificates()
 		lbconfig = self.lb_service.lbConfig
 		dcid = lbconfig.defaultCertificateId
@@ -153,10 +153,10 @@ class CertUpdater(RancherProxy):
 		if not cids:
 			cids = []
 
-		for cert_to_add in certs_to_add:
-			cn = cert_to_add.keys()[0]
-			if cn in self.certs_in_rancher:
-				cert_id = self.certs_in_rancher[cn]['cert_service'].id
+		for cert_deets in newcerts:
+			name = cert_deets['CN']
+			if name in self.certs_in_rancher:
+				cert_id = self.certs_in_rancher[name]['cert_service'].id
 
 				if dcid is None:
 					lbconfig.defaultCertificateId = dcid = cert_id
@@ -215,6 +215,6 @@ class CertUpdater(RancherProxy):
 		retrieved_certs = self.le.getcerts(certs_to_retrieve)
 		# print retrieved_certs
 		self.__update_certs_in_rancher(retrieved_certs)
-		self.__update_certs_on_lb(self.cert_labels)
+		self.__update_certs_on_lb(retrieved_certs)
 
 		print "Set certificates in Rancher & LB!"
