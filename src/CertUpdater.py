@@ -215,6 +215,6 @@ class CertUpdater(RancherProxy):
 		retrieved_certs = self.le.getcerts(certs_to_retrieve)
 		# print retrieved_certs
 		self.__update_certs_in_rancher(retrieved_certs)
-		self.__update_certs_on_lb(retrieved_certs)
+		self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
 
 		print "Set certificates in Rancher & LB!"
