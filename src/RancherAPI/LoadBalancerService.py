@@ -28,7 +28,7 @@ class LBConfig(ServiceObject):
 
 	def populate(self, lbconfig):
 		self.certificateIds       = self.or_default(lbconfig, 'certificateIds', [])
-		self.defaultCertificateId = lbconfig['defaultCertificateId']
+		self.defaultCertificateId = self.or_default(lbconfig, 'defaultCertificateId', None)
 		self.portRules            = lbconfig['portRules']
 		self._set_rw('config', self.or_default(lbconfig, 'config', {}))
 		#self._set_rw('stickinessPolicy', lbconfig['stickinessPolicy'])
