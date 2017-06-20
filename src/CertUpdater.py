@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 class CertUpdater(RancherProxy):
 	def __init__(self, working_dir):
-		self.lee = LeeCaller.load(os.path.join(working_dir, 'lee_seed.json'))
 		self.target_loadbalancer_name = None
 		super(CertUpdater, self).__init__()
 
@@ -18,6 +17,7 @@ class CertUpdater(RancherProxy):
 			except KeyError, e:
 				raise Exception("You must set label autoconfig.proxy.service_name as target load balancer name")
 
+		LeeCaller.load(os.path.join(working_dir, 'lee_seed.json'))
 
 		self.lb_service = LoadBalancerService(self.target_loadbalancer_name, url = self.cattle_url, auth_list = self.auth_list)
 
@@ -176,7 +176,7 @@ class CertUpdater(RancherProxy):
 		# print certs_not_renewal
 
 		print certs_to_retrieve
-		retrieved_certs = self.lee.request_certificates(certs_to_retrieve)
+		retrieved_certs = LeeCaller.request_certificates(certs_to_retrieve)
 		# print retrieved_certs
 		# self.__update_certs_in_rancher(retrieved_certs)
 		# self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
