@@ -177,8 +177,8 @@ class CertUpdater(RancherProxy):
 
 		print certs_to_retrieve
 		retrieved_certs = LeeCaller.request_certificates(certs_to_retrieve)
-		print retrieved_certs
-		# self.__update_certs_in_rancher(retrieved_certs)
+		print [x for x in retrieved_certs if x.has_key('error')]
+		self.__update_certs_in_rancher([x for x in retrieved_certs if not x.has_key('error')])
 		# self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
 
 		print "Set certificates in Rancher & LB!"

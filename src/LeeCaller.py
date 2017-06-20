@@ -47,22 +47,21 @@ def build_request(tld, common_name, alt_names):
 def build_response(json_req, json_resp):
     json_resp = json_resp['status']
     try:
-        return {
-            'tld':         json_req['tld'],
-            'common_name': json_req['common_name'],
-            'alt_names':   json_req['alt_names'],
-            'cert':        json_resp['cert'],
-            'chain':       json_resp['im'],
-            'key':         json_resp['key']
-        }
+        if json_resp.has_key('error'):
+            json_req['error'] = json_resp['error']
+        else:
+            json_req['cert']  = json_resp['cert']
+            json_req['chain'] = json_resp['im']
+            json_req['key']   = json_resp['key']
+        return json_req
     except KeyError as e:
         print json_req
         print json_resp
-        return {
-            'error': e
-        }
+        json_req['error'] = e
+        return json_req
 
 def make_request(req):
+    print req
     global HTTP_POOL
     global SEED_DATA
     json_req = build_request(req['tld'], req['common_name'], req['alt_names'])
@@ -70,13 +69,15 @@ def make_request(req):
         return json_req
 
     resp = HTTP_POOL.request('POST', "/get_cert", body = json.dumps(json_req).encode('utf-8'), headers = {'Content-Type': 'application/json'}, retries = 0, timeout = 300.0)
-    json_resp = json.loads(resp.data.decode('utf-8'))
-    return build_response(json_req, json_resp)
+    if resp.status is 200:
+        json_resp = json.loads(resp.data.decode('utf-8'))
+        return build_response(json_req, json_resp)
+    else:
+        return build_response(json_req, {'status': {'error': resp.data}})
 
 def request_certificates(domains):
     print domains
-    THREAD_POOL = ProcessPool(processes=5)
-    return THREAD_POOL.map(make_request, domains)
+    return [make_request(domain) for domain in domains]
 
 if __name__ == '__main__':
     domains = [
