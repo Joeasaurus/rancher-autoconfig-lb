@@ -35,7 +35,7 @@ class CertUpdater(RancherProxy):
 		for s_cert in self.certificates:
 			cs = CertificateService(url = self.api_url, id = s_cert['id'], auth_list = self.auth_list)
 
-			self.certs_in_rancher[s_cert['common_name']] = {
+			self.certs_in_rancher[s_cert['CN']] = {
 				'id':        s_cert['id'],
 				'expiresAt': s_cert['expiresAt'],
 				'cert_service': cs
