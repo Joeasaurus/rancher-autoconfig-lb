@@ -74,6 +74,7 @@ def make_request(req):
     return build_response(json_req, json_resp)
 
 def request_certificates(domains):
+    print domains
     THREAD_POOL = ProcessPool(processes=5)
     return THREAD_POOL.map(make_request, domains)
 

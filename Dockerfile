@@ -2,7 +2,7 @@ FROM alpine
 
 MAINTAINER Joe Eaves <joe.eaves@shadowacre.ltd>
 
-RUN apk update && apk add python py2-pip vim
+RUN apk update && apk add gcc musl-dev python python-dev py2-pip vim
 
 WORKDIR /var/lib/rancher-autoconfig-lb/
 ADD src/requirements.txt /tmp/
