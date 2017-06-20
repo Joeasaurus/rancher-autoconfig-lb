@@ -14,6 +14,7 @@ ENV AWS_ACCESS_KEY_ID XXXXXXXXX
 ENV AWS_SECRET_ACCESS_KEY XXXXXXXX
 ENV AWS_ZONE_ID XXXXXXXX
 ENV CA https://acme-v01.api.letsencrypt.org/directory
+ENV LEE_SEED_JSON "{}"
 ENV LE_WORK_DIR "/var/lib/rancher-autoconfig-lb/.le"
 
 CMD cd /var/lib/rancher-autoconfig-lb && python -u run.py

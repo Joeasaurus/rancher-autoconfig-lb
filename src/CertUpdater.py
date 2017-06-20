@@ -1,46 +1,11 @@
 from RancherAPI import *
-from LetsEncrypt import LEProxy
+import LeeCaller
 import subprocess, sys, os
 from datetime import datetime, timedelta
 
-class ChangingList(object):
-	def __init__(self):
-		self.list = []
-		self.last_list = []
-		self.changed = False
-
-	def append(self, newitem):
-		self.list.append(newitem)
-
-	def new_list(self):
-		self.last_list = self.list
-		self.list = []
-
-	def has_changes(self, key_a, key_b):
-		add = []
-		remove = []
-		update = []
-
-		_old = dict([(x[key_a], x[key_b]) for x in self.last_list])
-		_new = dict([(x[key_a], x[key_b]) for x in self.list])
-
-		for k in (set(_new) - set(_old)):
-			add.append({k: _new[k]})
-
-		for k in (set(_old) - set(_new)):
-			remove.append({k: _old[k]})
-
-		for k in (set(_new) & set(_old)):
-			if set(_new[k]) != set(_old[k]):
-				update.append([{k: _old[k]}, {k: _new[k]}])
-
-		self.changed = ( (len(add) > 0) or (len(remove) > 0) or (len(update) > 0) )
-
-		return (self.changed, add, remove, update)
-
 class CertUpdater(RancherProxy):
 	def __init__(self, working_dir):
-		self.le = LEProxy(working_dir)
+		self.lee = LeeCaller.load(os.path.join(working_dir, 'lee_seed.json'))
 		self.target_loadbalancer_name = None
 		super(CertUpdater, self).__init__()
 
@@ -60,7 +25,6 @@ class CertUpdater(RancherProxy):
 
 		self.__get_certificates()
 
-
 	def __is_certed_service(self, service):
 		return (self.is_suitable_service(service) and ( 'autoconfig.proxy.certificates' in service['launchConfig']['labels'] ))
 
@@ -71,7 +35,7 @@ class CertUpdater(RancherProxy):
 		for s_cert in self.certificates:
 			cs = CertificateService(url = self.api_url, id = s_cert['id'], auth_list = self.auth_list)
 
-			self.certs_in_rancher[s_cert['CN']] = {
+			self.certs_in_rancher[s_cert['common_name']] = {
 				'id':        s_cert['id'],
 				'expiresAt': s_cert['expiresAt'],
 				'cert_service': cs
@@ -98,17 +62,17 @@ class CertUpdater(RancherProxy):
 			if self.__is_certed_service(service):
 				certstring = self.get_label(service, 'autoconfig.proxy.certificates')
 
-				# i.e. TITLE : COMMA LIST ; TITLE.....
+				# i.e. TLD : TITLE : COMMA LIST ; TITLE.....
 				separate_certs = certstring.replace(' ', '').split(';')
 
 				for certspec in separate_certs:
 					title_split = certspec.split(':')
 					alt_names = []
 
-					if len(title_split) > 1:
-						alt_names = title_split[1:]
+					if len(title_split) > 2:
+						alt_names = title_split[2:]
 
-					self.cert_labels.append({'CN': title_split[0], 'alt_names': alt_names})
+					self.cert_labels.append({'tld': title_split[0], 'common_name': title_split[1], 'alt_names': alt_names})
 
 		return self.cert_labels
 
@@ -122,7 +86,7 @@ class CertUpdater(RancherProxy):
 	def __update_certs_in_rancher(self, certs):
 		for cert_deets in certs:
 			print cert_deets
-			name = cert_deets['CN']
+			name = cert_deets['common_name']
 			description = "Managed by rancher-autoconfig-lb"
 
 			if name in self.certs_in_rancher:
@@ -154,7 +118,7 @@ class CertUpdater(RancherProxy):
 			cids = []
 
 		for cert_deets in newcerts:
-			name = cert_deets['CN']
+			name = cert_deets['common_name']
 			if name in self.certs_in_rancher:
 				cert_id = self.certs_in_rancher[name]['cert_service'].id
 
@@ -178,7 +142,7 @@ class CertUpdater(RancherProxy):
 		for label in labels:
 			label_cn = label.keys()[0]
 			label_cn_dict = {
-				'CN':        label_cn,
+				'common_name': label_cn,
 				'alt_names': label[label_cn]
 			}
 			callback(label_cn_dict)
@@ -196,9 +160,9 @@ class CertUpdater(RancherProxy):
 		print self.cert_labels
 
 		def check_for_retrieval(cn_dict):
-			if cn_dict['CN'] in self.certs_in_rancher:
-				cn_dict['id'] = self.certs_in_rancher[cn_dict['CN']]['id']
-				if not self.certs_for_renewal.has_key(cn_dict['CN']):
+			if cn_dict['common_name'] in self.certs_in_rancher:
+				cn_dict['id'] = self.certs_in_rancher[cn_dict['common_name']]['id']
+				if not self.certs_for_renewal.has_key(cn_dict['common_name']):
 					return certs_not_renewal.append(cn_dict)
 
 			certs_to_retrieve.append(cn_dict)
@@ -212,9 +176,9 @@ class CertUpdater(RancherProxy):
 		# print certs_not_renewal
 
 		print certs_to_retrieve
-		retrieved_certs = self.le.getcerts(certs_to_retrieve)
+		retrieved_certs = self.lee.request_certificates(certs_to_retrieve)
 		# print retrieved_certs
-		self.__update_certs_in_rancher(retrieved_certs)
-		self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
+		# self.__update_certs_in_rancher(retrieved_certs)
+		# self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
 
 		print "Set certificates in Rancher & LB!"
