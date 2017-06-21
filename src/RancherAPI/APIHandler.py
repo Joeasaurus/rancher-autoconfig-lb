@@ -25,7 +25,7 @@ class MetadataAPI(object):
 			use_url = self.api_url + url
 		#print self.api_url + url
 
-		while (i <= 5 and not success):
+		while (i <= self.max_attempts and not success):
 			try:
 				if kwargs and 'payload' in kwargs:
 					req = callback(use_url, kwargs['payload'])
