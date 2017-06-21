@@ -95,9 +95,9 @@ class CertUpdater(RancherProxy):
 				cert_service = CertificateService(url = self.api_url, auth_list = self.auth_list)
 
 			if cert_deets['cert']:
-				cert_service.cert = self.__get_file_contents(cert_deets['cert'])
-				cert_service.key = self.__get_file_contents(cert_deets['key'])
-				cert_service.certChain = self.__get_file_contents(cert_deets['chain'])
+				cert_service.cert = cert_deets['cert']
+				cert_service.key = cert_deets['key']
+				cert_service.certChain = cert_deets['chain']
 
 			cert_service.name = name
 			cert_service.description = description
