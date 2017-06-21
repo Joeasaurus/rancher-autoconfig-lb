@@ -68,7 +68,7 @@ def make_request(req):
     if json_req.get('error', False):
         return json_req
 
-    resp = HTTP_POOL.request('POST', "/get_cert", body = json.dumps(json_req).encode('utf-8'), headers = {'Content-Type': 'application/json'}, retries = 0, timeout = 300.0)
+    resp = HTTP_POOL.request('POST', "/get_cert", body = json.dumps(json_req).encode('utf-8'), headers = {'Content-Type': 'application/json'}, retries = 2, timeout = 300.0)
     if resp.status is 200:
         json_resp = json.loads(resp.data.decode('utf-8'))
         return build_response(json_req, json_resp)

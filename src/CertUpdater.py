@@ -94,10 +94,10 @@ class CertUpdater(RancherProxy):
 			else:
 				cert_service = CertificateService(url = self.api_url, auth_list = self.auth_list)
 
-			if cert_deets['ssl']:
-				cert_service.cert = self.__get_file_contents(cert_deets['ssl']['cert'])
-				cert_service.key = self.__get_file_contents(cert_deets['ssl']['key'])
-				cert_service.certChain = self.__get_file_contents(cert_deets['ssl']['im'])
+			if cert_deets['cert']:
+				cert_service.cert = self.__get_file_contents(cert_deets['cert'])
+				cert_service.key = self.__get_file_contents(cert_deets['key'])
+				cert_service.certChain = self.__get_file_contents(cert_deets['chain'])
 
 			cert_service.name = name
 			cert_service.description = description
@@ -179,6 +179,6 @@ class CertUpdater(RancherProxy):
 		retrieved_certs = LeeCaller.request_certificates(certs_to_retrieve)
 		print [x for x in retrieved_certs if x.has_key('error')]
 		self.__update_certs_in_rancher([x for x in retrieved_certs if not x.has_key('error')])
-		# self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
+		self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
 
 		print "Set certificates in Rancher & LB!"
