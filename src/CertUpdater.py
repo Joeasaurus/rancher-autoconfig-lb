@@ -85,7 +85,7 @@ class CertUpdater(RancherProxy):
 
 	def __update_certs_in_rancher(self, certs):
 		for cert_deets in certs:
-			print cert_deets
+			print "CERT UPDATING IN RANCHER: ", str(cert_deets)
 			name = cert_deets['common_name']
 			description = "Managed by rancher-autoconfig-lb"
 
@@ -114,11 +114,13 @@ class CertUpdater(RancherProxy):
 		lbconfig = self.lb_service.lbConfig
 		dcid = lbconfig.defaultCertificateId
 		cids = lbconfig.certificateIds
+		print "DUMPING CIDS: ", str(cids)
 		if not cids:
 			cids = []
 
 		for cert_deets in newcerts:
 			name = cert_deets['common_name']
+			print name, self.certs_in_rancher
 			if name in self.certs_in_rancher:
 				cert_id = self.certs_in_rancher[name]['cert_service'].id
 
@@ -132,6 +134,7 @@ class CertUpdater(RancherProxy):
 		if len(cids) > 0:
 			lbconfig.certificateIds = cids
 
+		print "DUMPING LBCONFIG PAYLOAD:"
 		print lbconfig.payload()
 
 		self.lb_service.lbConfig = lbconfig
@@ -148,6 +151,7 @@ class CertUpdater(RancherProxy):
 			callback(label_cn_dict)
 
 	def update(self):
+		print "Retrieving certificates from rancher: "
 		self.__get_certificates()
 		self.__get_renewal_certificates()
 		print self.certs_in_rancher
@@ -155,6 +159,7 @@ class CertUpdater(RancherProxy):
 		certs_to_retrieve = []
 		certs_not_renewal = []
 
+		print "Getting certificate labels from services:"
 		self.__get_cert_labels()
 		print self.cert_labels
 
@@ -174,10 +179,15 @@ class CertUpdater(RancherProxy):
 		# print self.certs_for_renewal
 		# print certs_not_renewal
 
+		print "Certificates we will retrieve: "
 		print certs_to_retrieve
+
 		retrieved_certs = LeeCaller.request_certificates(certs_to_retrieve)
-		print "ERRORS " + str([x for x in retrieved_certs if x.has_key('error')])
-		self.__update_certs_in_rancher([x for x in retrieved_certs if not x.has_key('error')])
-		self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
+		success_certs   = [x for x in retrieved_certs if not x.has_key('error')]
+		fail_certs      = [x for x in retrieved_certs if x.has_key('error')]
+		print "SUCCESSES: ", str(success_certs)
+		print "ERRORS ", str(fail_certs)
+		self.__update_certs_in_rancher()
+		self.__update_certs_on_lb(certs_not_renewal + success_certs)
 
 		print "Set certificates in Rancher & LB!"
