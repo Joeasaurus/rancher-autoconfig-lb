@@ -81,7 +81,9 @@ class CertificateService(ServiceObject):
 		return (self.today - self.renewal_days <= expires_stamp <= self.today + self.renewal_days)
 
 	def create(self):
-		self.api_call(self.api_cb_post, self.url % '', payload = self._get_payload())
+		print self._get_payload()
+		api_data = self.api_call(self.api_cb_post, self.url % '', payload = self._get_payload())
+		print api_data
 
 	def update(self):
 		self.api_call(self.api_cb_put, self.url % self.id, payload = self._get_payload())

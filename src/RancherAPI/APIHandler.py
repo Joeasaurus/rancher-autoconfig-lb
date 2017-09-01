@@ -42,6 +42,7 @@ class MetadataAPI(object):
 			i = i + 1
 
 		if not success or self.is_error(data):
+			print data
 			raise RuntimeError("Failed to query Rancher Metadata API (%d out of %d attempts failed)" % (i, self.max_attempts))
 
 		return data

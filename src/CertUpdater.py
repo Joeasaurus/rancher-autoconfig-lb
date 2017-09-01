@@ -150,7 +150,6 @@ class CertUpdater(RancherProxy):
 	def update(self):
 		self.__get_certificates()
 		self.__get_renewal_certificates()
-		#print self.lb_service.defaultCertificateId, self.lb_service.certificateIds
 		print self.certs_in_rancher
 
 		certs_to_retrieve = []
@@ -177,7 +176,7 @@ class CertUpdater(RancherProxy):
 
 		print certs_to_retrieve
 		retrieved_certs = LeeCaller.request_certificates(certs_to_retrieve)
-		print [x for x in retrieved_certs if x.has_key('error')]
+		print "ERRORS " + str([x for x in retrieved_certs if x.has_key('error')])
 		self.__update_certs_in_rancher([x for x in retrieved_certs if not x.has_key('error')])
 		self.__update_certs_on_lb(certs_not_renewal + retrieved_certs)
 
