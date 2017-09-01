@@ -71,12 +71,13 @@ def make_request(req):
     resp = HTTP_POOL.request('POST', "/get_cert", body = json.dumps(json_req).encode('utf-8'), headers = {'Content-Type': 'application/json'}, retries = 2, timeout = 300.0)
     if resp.status is 200:
         json_resp = json.loads(resp.data.decode('utf-8'))
+        if req.has_key('id'):
+            json_resp['id'] = req['id']
         return build_response(json_req, json_resp)
     else:
-        return build_response(json_req, {'status': {'error': resp.data}})
+        return build_response(json_req, {'status': {'id': req['id'], 'error': resp.data}})
 
 def request_certificates(domains):
-    print domains
     return [make_request(domain) for domain in domains]
 
 if __name__ == '__main__':

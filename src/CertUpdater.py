@@ -187,7 +187,7 @@ class CertUpdater(RancherProxy):
 		fail_certs      = [x for x in retrieved_certs if x.has_key('error')]
 		print "SUCCESSES: ", str(success_certs)
 		print "ERRORS ", str(fail_certs)
-		self.__update_certs_in_rancher()
+		self.__update_certs_in_rancher(success_certs)
 		self.__update_certs_on_lb(certs_not_renewal + success_certs)
 
 		print "Set certificates in Rancher & LB!"
