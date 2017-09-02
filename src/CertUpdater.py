@@ -126,10 +126,8 @@ class CertUpdater(RancherProxy):
 
 				if dcid is None:
 					lbconfig.defaultCertificateId = dcid = cert_id
-				elif cert_id not in [dcid] + cids:
-					cids.append(cert_id)
 				else:
-					print "Certificate already registered on LB"
+					cids.append(cert_id)
 
 		if len(cids) > 0:
 			lbconfig.certificateIds = cids
