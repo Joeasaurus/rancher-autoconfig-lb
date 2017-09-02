@@ -53,6 +53,8 @@ def build_response(json_req, json_resp):
             json_req['cert']  = json_resp['cert']
             json_req['chain'] = json_resp['im']
             json_req['key']   = json_resp['key']
+        if json_resp.has_key('id'):
+            json_req['id']    = json_resp['id']
         return json_req
     except KeyError as e:
         print json_req
@@ -72,7 +74,7 @@ def make_request(req):
     if resp.status is 200:
         json_resp = json.loads(resp.data.decode('utf-8'))
         if req.has_key('id'):
-            json_resp['id'] = req['id']
+            json_resp['status']['id'] = req['id']
         return build_response(json_req, json_resp)
     else:
         return build_response(json_req, {'status': {'id': req['id'], 'error': resp.data}})
