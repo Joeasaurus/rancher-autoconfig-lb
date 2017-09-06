@@ -87,5 +87,5 @@ class CertificateService(ServiceObject):
 
 	def update(self):
 		print self._get_payload()
-		self.api_call(self.api_cb_put, self.url % self.id, payload = self._get_payload())
+		api_data = self.api_call(self.api_cb_put, self.url % self.id, payload = self._get_payload())
 		print api_data
