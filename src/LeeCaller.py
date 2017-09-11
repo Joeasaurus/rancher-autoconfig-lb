@@ -77,7 +77,7 @@ def make_request(req):
             json_resp['status']['id'] = req['id']
         return build_response(json_req, json_resp)
     else:
-        return build_response(json_req, {'status': {'id': req['id'], 'error': resp.data}})
+        return build_response(json_req, {'status': {'id': req.get('id', None), 'error': resp.data}})
 
 def request_certificates(domains):
     return [make_request(domain) for domain in domains]
